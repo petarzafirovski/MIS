@@ -28,7 +28,7 @@ class MyHomePage extends StatefulWidget {
 class _MyHomePageState extends State<MyHomePage> {
   List<String> courses = ['Вовед во науката за податоци', 'Мобилни информациски системи'];
 
-  final TextEditingController _textFieldController = TextEditingController();
+  TextEditingController _textFieldController = TextEditingController();
 
   void _addCourse(String course) {
     setState(() {

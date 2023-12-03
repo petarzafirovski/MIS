@@ -1,10 +1,10 @@
 {
     "logs": [
         {
-            "outputFile": "C:\\Users\\zafir\\OneDrive\\Desktop\\MIS - LABS\\Lab01_191537\\build\\app\\intermediates\\incremental\\mergeDebugResources\\merged.dir\\values-night-v8\\values-night-v8.xml",
+            "outputFile": "C:\\Users\\zafir\\OneDrive\\Desktop\\Lab01_191537\\build\\app\\intermediates\\incremental\\mergeDebugResources\\merged.dir\\values-night-v8\\values-night-v8.xml",
             "map": [
                 {
-                    "source": "C:\\Users\\zafir\\OneDrive\\Desktop\\MIS - LABS\\Lab01_191537\\android\\app\\src\\main\\res\\values-night\\styles.xml",
+                    "source": "C:\\Users\\zafir\\OneDrive\\Desktop\\Lab01_191537\\android\\app\\src\\main\\res\\values-night\\styles.xml",
                     "from": {
                         "startLines": "3,14",
                         "startColumns": "4,4",
