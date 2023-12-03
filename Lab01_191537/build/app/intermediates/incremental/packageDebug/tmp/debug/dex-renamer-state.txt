@@ -1,0 +1,4 @@
+#Sun Dec 03 23:47:07 CET 2023
+base.0=C\:\\Users\\zafir\\OneDrive\\Desktop\\MIS - LABS\\Lab01_191537\\build\\app\\intermediates\\dex\\debug\\mergeDexDebug\\classes.dex
+path.0=classes.dex
+renamed.0=classes.dex
