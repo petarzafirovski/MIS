@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'exam_model.dart';
+import 'package:lab3_main/models/constants/professors_list.dart';
+import '../models/exam_model.dart';
 
 class ExamWidget extends StatefulWidget {
   final Function(Exam) addExam;
@@ -14,6 +15,8 @@ class ExamWidgetState extends State<ExamWidget> {
   final TextEditingController subjectController = TextEditingController();
   DateTime selectedDate = DateTime.now();
   TimeOfDay selectedTime = TimeOfDay.now();
+  String? selectedProfessor;
+  static const List<String> professors = Professors.professors;
 
   Future<void> _selectDate(BuildContext context) async {
     final DateTime? datePicked = await showDatePicker(
@@ -54,7 +57,7 @@ class ExamWidgetState extends State<ExamWidget> {
     return Container(
       color: Colors.white,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -63,11 +66,26 @@ class ExamWidgetState extends State<ExamWidget> {
               decoration: const InputDecoration(labelText: 'Subject'),
             ),
             const SizedBox(height: 16),
+            DropdownButtonFormField<String>(
+              value: selectedProfessor,
+              decoration: const InputDecoration(labelText: 'Professor'),
+              items: professors.map<DropdownMenuItem<String>>((String value) {
+                return DropdownMenuItem<String>(
+                  value: value,
+                  child: Text(value),
+                );
+              }).toList(),
+              onChanged: (String? newValue) {
+                setState(() {
+                  selectedProfessor = newValue;
+                });
+              },
+            ),
+            const SizedBox(height: 16),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                    'Date: ${selectedDate.toLocal().toString().split(' ')[0]}'),
+                Text('Date: ${selectedDate.toLocal().toString().split(' ')[0]}'),
                 ElevatedButton(
                   child: const Text('Select Date'),
                   onPressed: () => _selectDate(context),
@@ -78,8 +96,7 @@ class ExamWidgetState extends State<ExamWidget> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                    'Time: ${selectedDate.toLocal().toString().split(' ')[1].substring(0, 5)}'),
+                Text('Time: ${selectedDate.toLocal().toString().split(' ')[1].substring(0, 5)}'),
                 ElevatedButton(
                   onPressed: () => _selectTime(context),
                   child: const Text('Select Time'),
@@ -88,10 +105,11 @@ class ExamWidgetState extends State<ExamWidget> {
             ),
             const SizedBox(height: 32),
             ElevatedButton(
-              onPressed: () {
+              onPressed: selectedProfessor == null ? null : () {
                 Exam exam = Exam(
                   course: subjectController.text,
                   timestamp: selectedDate,
+                  professor: selectedProfessor!, // Include the selected professor in the Exam
                 );
                 widget.addExam(exam);
                 Navigator.pop(context);

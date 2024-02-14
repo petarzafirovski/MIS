@@ -1,13 +1,38 @@
+import 'package:awesome_notifications/awesome_notifications.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'exam_model.dart';
-import 'exam_widget.dart';
-import 'firebase_options.dart';
+import 'package:intl/intl.dart';
+import 'package:lab3_main/widgets/exam_widget.dart';
+import 'configs/firebase_options.dart';
+import 'models/constants/professors_list.dart';
+import 'widgets/calendar_widget.dart';
+import 'models/exam_model.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'configs/notification_handler.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
+  await AwesomeNotifications().initialize(null, [
+    NotificationChannel(
+      channelGroupKey: "channel_group_key",
+      channelKey: "channel_key",
+      channelName: "basic_notif",
+      channelDescription: "local push notifications for lab4",
+    )
+  ], channelGroups: [
+    NotificationChannelGroup(
+        channelGroupKey: "channel_group_key", channelGroupName: "channel_group")
+  ]);
+
+  bool isAllowedToSendNotification =
+  await AwesomeNotifications().isNotificationAllowed();
+
+  if (!isAllowedToSendNotification) {
+    AwesomeNotifications().requestPermissionToSendNotifications();
+  }
+
   runApp(const MyApp());
 }
 
@@ -36,9 +61,26 @@ class MainListScreen extends StatefulWidget {
 
 class MainListScreenState extends State<MainListScreen> {
   final List<Exam> exams = [
-    Exam(course: 'МИС', timestamp: DateTime.now()),
-    Exam(course: 'Вовед во Науката за Податоци', timestamp: DateTime(2024, 02, 09)),
+    Exam(course: 'МИС', timestamp: DateTime(2024, 02, 17), professor: Professors.professors[0]),
+    Exam(course: 'Вовед во науката за податоци', timestamp: DateTime(2023, 12, 31), professor: Professors.professors[1]),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    AwesomeNotifications().setListeners(
+      onActionReceivedMethod: CustomNotificationHandler.handleUserAction,
+      onDismissActionReceivedMethod: CustomNotificationHandler.handleNotificationDismissed,
+      onNotificationCreatedMethod: CustomNotificationHandler.handleNotificationCreated,
+      onNotificationDisplayedMethod: CustomNotificationHandler.handleNotificationDisplayed);
+    _scheduleNotificationsForExistingExams();
+  }
+
+  void _scheduleNotificationsForExistingExams() {
+    for (int i = 0; i < exams.length; i++) {
+      _scheduleNotification(exams[i]);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -46,6 +88,10 @@ class MainListScreenState extends State<MainListScreen> {
       appBar: AppBar(
         title: const Text('Exams'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.calendar_month),
+            onPressed: _openCalendar,
+          ),
           IconButton(
             icon: const Icon(Icons.add),
             onPressed: () => FirebaseAuth.instance.currentUser != null
@@ -67,7 +113,12 @@ class MainListScreenState extends State<MainListScreen> {
         itemCount: exams.length,
         itemBuilder: (context, index) {
           final course = exams[index].course;
-          final timestamp = exams[index].timestamp;
+
+          var timestamp = exams[index].timestamp;
+          final date = DateTime(timestamp.year, timestamp.month, timestamp.day);
+          final dateString = DateFormat('yyyy-MM-dd').format(date);
+
+          final professor = exams[index].professor;
 
           return Card(
             child: Padding(
@@ -79,9 +130,13 @@ class MainListScreenState extends State<MainListScreen> {
                     course,
                     style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
+                  Text(
+                    'Професор: $professor',
+                    style: const TextStyle(fontWeight: FontWeight.w500,color: Colors.brown),
+                  ),
                   const SizedBox(height: 8.0),
                   Text(
-                    timestamp.toString(),
+                    dateString,
                     style: const TextStyle(color: Colors.grey),
                   ),
                 ],
@@ -93,14 +148,13 @@ class MainListScreenState extends State<MainListScreen> {
     );
   }
 
-  Future<void> _signOut() async {
-    await FirebaseAuth.instance.signOut();
-  }
-
-  void _navigateToSignInPage(BuildContext context) {
-    Future.delayed(Duration.zero, () {
-      Navigator.pushReplacementNamed(context, '/login');
-    });
+  void _openCalendar() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => CalendarWidget(exams: exams),
+      ),
+    );
   }
 
   Future<void> _addExamFunction(BuildContext context) async {
@@ -120,8 +174,33 @@ class MainListScreenState extends State<MainListScreen> {
   void _addExam(Exam exam) {
     setState(() {
       exams.add(exam);
+      _scheduleNotification(exam);
     });
   }
+
+  Future<void> _signOut() async {
+    await FirebaseAuth.instance.signOut();
+  }
+
+  void _navigateToSignInPage(BuildContext context) {
+    Future.delayed(Duration.zero, () {
+      Navigator.pushReplacementNamed(context, '/login');
+    });
+  }
+
+  void _scheduleNotification(Exam exam) {
+    final int notificationId = exams.indexOf(exam);
+
+    AwesomeNotifications().createNotification(
+      content: NotificationContent(
+        id: notificationId,
+        channelKey: "channel_key",
+        title: exam.course,
+        body: "Известување за нов испит",
+      ),
+    );
+  }
+
 }
 
 class AuthScreen extends StatefulWidget {
