@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:lab3_main/models/constants/laboratories_list.dart';
 import 'package:lab3_main/models/constants/professors_list.dart';
+import 'package:lab3_main/models/laboratory.dart';
 import '../models/exam_model.dart';
 
 class ExamWidget extends StatefulWidget {
@@ -17,6 +19,8 @@ class ExamWidgetState extends State<ExamWidget> {
   TimeOfDay selectedTime = TimeOfDay.now();
   String? selectedProfessor;
   static const List<String> professors = Professors.professors;
+  Laboratory? selectedLaboratory;
+
 
   Future<void> _selectDate(BuildContext context) async {
     final DateTime? datePicked = await showDatePicker(
@@ -68,6 +72,7 @@ class ExamWidgetState extends State<ExamWidget> {
             const SizedBox(height: 16),
             DropdownButtonFormField<String>(
               value: selectedProfessor,
+              hint: const Text('Select a professor'),
               decoration: const InputDecoration(labelText: 'Professor'),
               items: professors.map<DropdownMenuItem<String>>((String value) {
                 return DropdownMenuItem<String>(
@@ -78,6 +83,22 @@ class ExamWidgetState extends State<ExamWidget> {
               onChanged: (String? newValue) {
                 setState(() {
                   selectedProfessor = newValue;
+                });
+              },
+            ),
+            DropdownButtonFormField<Laboratory>(
+              value: selectedLaboratory,
+              hint: const Text('Select a Laboratory'),
+              decoration: const InputDecoration(labelText: 'Professor'),
+              items: Laboratories.laboratories.map<DropdownMenuItem<Laboratory>>((Laboratory lab) {
+                return DropdownMenuItem<Laboratory>(
+                  value: lab,
+                  child: Text(lab.name),
+                );
+              }).toList(),
+              onChanged: (Laboratory? newValue) {
+                setState(() {
+                  selectedLaboratory = newValue;
                 });
               },
             ),
@@ -109,7 +130,8 @@ class ExamWidgetState extends State<ExamWidget> {
                 Exam exam = Exam(
                   course: subjectController.text,
                   timestamp: selectedDate,
-                  professor: selectedProfessor!, // Include the selected professor in the Exam
+                  professor: selectedProfessor!,
+                  laboratory: selectedLaboratory!
                 );
                 widget.addExam(exam);
                 Navigator.pop(context);

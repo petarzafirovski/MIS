@@ -1,10 +1,19 @@
+import 'dart:convert';
+
 import 'package:awesome_notifications/awesome_notifications.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:intl/intl.dart';
+import 'package:lab3_main/models/constants/laboratories_list.dart';
 import 'package:lab3_main/widgets/exam_widget.dart';
+import 'package:lab3_main/widgets/map_widget.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'configs/firebase_options.dart';
 import 'models/constants/professors_list.dart';
+import 'package:http/http.dart' as http;
 import 'widgets/calendar_widget.dart';
 import 'models/exam_model.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -61,9 +70,11 @@ class MainListScreen extends StatefulWidget {
 
 class MainListScreenState extends State<MainListScreen> {
   final List<Exam> exams = [
-    Exam(course: 'МИС', timestamp: DateTime(2024, 02, 17), professor: Professors.professors[0]),
-    Exam(course: 'Вовед во науката за податоци', timestamp: DateTime(2023, 12, 31), professor: Professors.professors[1]),
+    Exam(course: 'МИС', timestamp: DateTime(2024, 02, 17), professor: Professors.professors[0], laboratory: Laboratories.laboratories[0]),
+    Exam(course: 'Вовед во науката за податоци', timestamp: DateTime(2023, 12, 31), professor: Professors.professors[1], laboratory: Laboratories.laboratories[2]),
   ];
+  var latitude = 41.98995796010974;
+  var longitude = 21.426163436700108;
 
   @override
   void initState() {
@@ -73,7 +84,16 @@ class MainListScreenState extends State<MainListScreen> {
       onDismissActionReceivedMethod: CustomNotificationHandler.handleNotificationDismissed,
       onNotificationCreatedMethod: CustomNotificationHandler.handleNotificationCreated,
       onNotificationDisplayedMethod: CustomNotificationHandler.handleNotificationDisplayed);
+
+    _requestLocationPermissions();
     _scheduleNotificationsForExistingExams();
+  }
+
+  void _requestLocationPermissions() async {
+    var status = await Permission.locationWhenInUse.request();
+    if (status.isGranted) {
+      _monitorLocation();
+    }
   }
 
   void _scheduleNotificationsForExistingExams() {
@@ -88,6 +108,15 @@ class MainListScreenState extends State<MainListScreen> {
       appBar: AppBar(
         title: const Text('Exams'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.map),
+            onPressed: () async {
+              final examsFetched = _fetchExams(); // Assuming this is an asynchronous operation
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (context) => MapScreen(exams: examsFetched)),
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.calendar_month),
             onPressed: _openCalendar,
@@ -117,37 +146,72 @@ class MainListScreenState extends State<MainListScreen> {
           var timestamp = exams[index].timestamp;
           final date = DateTime(timestamp.year, timestamp.month, timestamp.day);
           final dateString = DateFormat('yyyy-MM-dd').format(date);
-
+          final laboratory = exams[index].laboratory.name;
           final professor = exams[index].professor;
 
           return Card(
             child: Padding(
               padding: const EdgeInsets.all(8.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    course,
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  Text(
-                    'Професор: $professor',
-                    style: const TextStyle(fontWeight: FontWeight.w500,color: Colors.brown),
-                  ),
-                  const SizedBox(height: 8.0),
-                  Text(
-                    dateString,
-                    style: const TextStyle(color: Colors.grey),
-                  ),
-                ],
+              child: SingleChildScrollView( // Wrap with SingleChildScrollView
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      course,
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    Text(
+                      'Професор: $professor',
+                      style: const TextStyle(fontWeight: FontWeight.w500, color: Colors.brown),
+                    ),
+                    Text(
+                      'Лабораторија: $laboratory',
+                      style: const TextStyle(fontWeight: FontWeight.w500, color: Colors.blueAccent),
+                    ),
+                    const SizedBox(height: 8.0),
+                    Text(
+                      dateString,
+                      style: const TextStyle(color: Colors.grey),
+                    ),
+                    const SizedBox(height: 4.0), // Add some space before the button
+                    ElevatedButton(
+                      onPressed: () => _openMap(exams[index].laboratory.coordinates),
+                      style: ElevatedButton.styleFrom(
+                        foregroundColor: Colors.white, backgroundColor: Colors.blue,
+                      ),
+                      child: const Text('Погледни рута'),
+                    ),
+                  ],
+                ),
               ),
             ),
           );
+
+
         },
       ),
     );
   }
 
+  void _openMap(String destinationCoordinates) async {
+    final parts = destinationCoordinates.split(',');
+    if (parts.length != 2) {
+      return;
+    }
+    final double lat = double.tryParse(parts[0]) ?? 0;
+    final double lng = double.tryParse(parts[1]) ?? 0;
+
+    String url = 'https://www.google.com/maps/dir/?api=1&origin=41.98995796010974,21.426163436700108&destination=$lat,$lng&travelmode=driving&dir_action=navigate';
+
+    final Uri uri = Uri.parse(url);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri);
+    }
+  }
+
+  List<Exam> _fetchExams(){
+    return exams;
+  }
   void _openCalendar() {
     Navigator.push(
       context,
@@ -171,11 +235,61 @@ class MainListScreenState extends State<MainListScreen> {
         });
   }
 
+  void _monitorLocation() {
+    Geolocator.getPositionStream(desiredAccuracy: LocationAccuracy.high).listen((Position position) {
+      for (var exam in exams) {
+        _checkLocationForExam(exam, position);
+      }
+    });
+  }
+
+  void _checkLocationForExam(Exam exam, Position position) {
+    final examCoords = exam.laboratory.coordinates.split(',');
+    if (examCoords.length == 2) {
+      final double? lat = double.tryParse(examCoords[0]);
+      final double? lng = double.tryParse(examCoords[1]);
+      if (lat != null && lng != null) {
+        final distance = Geolocator.distanceBetween(position.latitude, position.longitude, lat, lng);
+        if (distance <= 3000) {
+          _createLocationBasedNotification(exam);
+        }
+      }
+    }
+  }
+
+
+  void _createLocationBasedNotification(Exam exam) {
+    final notificationId = exams.indexOf(exam) + 1000;
+    AwesomeNotifications().createNotification(
+      content: NotificationContent(
+        id: notificationId,
+        channelKey: "channel_key",
+        title: "You're near ${exam.course} exam location",
+        body: "Don't forget to review your notes!",
+      ),
+    );
+  }
+
   void _addExam(Exam exam) {
     setState(() {
       exams.add(exam);
       _scheduleNotification(exam);
     });
+    _checkCurrentLocationForNewExam(exam);
+  }
+
+  void _checkCurrentLocationForNewExam(Exam exam) async {
+    final Position currentPosition = Position(
+      latitude: latitude,
+      longitude: longitude,
+      timestamp: DateTime.now(),
+      accuracy: 0,
+      altitude: 0,
+      heading: 0,
+      speed: 0,
+      speedAccuracy: 0,
+    );
+    _checkLocationForExam(exam, currentPosition);
   }
 
   Future<void> _signOut() async {
@@ -200,6 +314,21 @@ class MainListScreenState extends State<MainListScreen> {
       ),
     );
   }
+
+  Future<String?> fetchRoutePolyline({required LatLng origin, required LatLng destination}) async {
+    final response = await http.get(Uri.parse(
+        'https://maps.googleapis.com/maps/api/directions/json?origin=${origin.latitude},${origin.longitude}&destination=${destination.latitude},${destination.longitude}&key=YOUR_API_KEY'));
+
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      // Extract the polyline from the response
+      final String? encodedPolyline = data['routes'][0]['overview_polyline']['points'];
+      return encodedPolyline;
+    } else {
+      return null;
+    }
+  }
+
 
 }
 

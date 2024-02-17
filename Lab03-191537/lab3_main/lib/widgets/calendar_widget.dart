@@ -82,7 +82,7 @@ class CalendarWidgetState extends State<CalendarWidget> {
             children: selectedExams.isEmpty
                 ? [const Text("No exams on this day.")]
                 : selectedExams
-                .map((exam) => Text('${exam.course} кај проф. ${exam.professor}'))
+                .map((exam) => Text('${exam.course} кај проф. ${exam.professor}, лабораторија: ${exam.laboratory.name}'))
                 .toList(),
           ),
         ),
